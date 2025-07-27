@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Panel — Islamic Quiz</title>
+  <style>
+    body { font-family:'Segoe UI', sans-serif; background:#f4f4f4; margin:0; padding:20px; }
+    .login-box, .dashboard { max-width:1000px; margin:auto; background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.1);}
+    input { width:100%; padding:10px; margin:5px 0; border:1px solid #ccc; border-radius:4px;}
+    button { padding:8px 14px; margin:5px; background:#e67e22; color:#fff; border:none; border-radius:4px; cursor:pointer;}
+    button:hover { background:#d35400; }
+    table { width:100%; border-collapse:collapse; margin-top:20px;}
+    th,td { padding:10px; border:1px solid #ddd; text-align:left; vertical-align: top; }
+    th { background:#e67e22; color:#fff; }
+    a { color: #2980b9; text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+  <!-- Admin Login -->
+  <div id="login" class="login-box">
+    <h2>Admin Login</h2>
+    <input type="email" id="adminEmail" placeholder="Email" />
+    <input type="password" id="adminPassword" placeholder="Password" />
+    <button onclick="adminLogin()">Login</button>
+    <p id="loginError" style="color:red;"></p>
+  </div>
+
+  <!-- Admin Dashboard -->
+  <div id="dashboard" class="dashboard" style="display:none;">
+    <h2>Registered Users</h2>
+    <button onclick="logout()">Logout</button>
+    <table>
+      <thead>
+        <tr>
+          <th>Username</th>
+          <th>Email / WhatsApp</th>
+          <th>Plan</th>
+          <th>Referred By</th>
+          <th>Screenshot</th>
+          <th>Contact File</th>
+          <th>IP / Device</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="userTableBody"></tbody>
+    </table>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyBa71bd1qm1vga00Ghcl14Mo6SPo8ng_etU",
+      authDomain: "islamic-quiz-3f4a2.firebaseapp.com",
+      databaseURL: "https://islamic-quiz-3f4a2-default-rtdb.firebaseio.com",
+      projectId: "islamic-quiz-3f4a2",
+      storageBucket: "islamic-quiz-3f4a2.appspot.com",
+      messagingSenderId: "521529942420",
+      appId: "1:521529942420:web:bb64ffcced52a02eb89511"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.database();
+
+    const ADMIN_EMAIL = "sahilwebsite6@gmail.com";
+
+    async function adminLogin() {
+      const email = document.getElementById("adminEmail").value.trim();
+      const password = document.getElementById("adminPassword").value.trim();
+      try {
+        const cred = await auth.signInWithEmailAndPassword(email, password);
+        if (cred.user.email !== ADMIN_EMAIL) throw new Error("Unauthorized admin email!");
+        document.getElementById("login").style.display = "none";
+        document.getElementById("dashboard").style.display = "block";
+        loadUsers();
+      } catch (err) {
+        document.getElementById("loginError").innerText = err.message;
+      }
+    }
+
+    function logout() {
+      auth.signOut().then(() => location.reload());
+    }
+
+    function loadUsers() {
+      db.ref("users").on("value", snapshot => {
+        const tbody = document.getElementById("userTableBody");
+        tbody.innerHTML = "";
+        snapshot.forEach(child => {
+          const data = child.val();
+          const key = child.key;
+
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${data.username}</td>
+            <td>${data.email}<br><strong>📞</strong> ${data.whatsapp}</td>
+            <td>${data.plan}</td>
+            <td>${data.referredBy || '—'}</td>
+            <td><a href="${data.screenshotURL}" target="_blank">View</a></td>
+            <td>${data.contactListURL ? `<a href="${data.contactListURL}" target="_blank">Download</a>` : '—'}</td>
+            <td><strong>IP:</strong> ${data.ipAddress || '—'}<br><strong>Device:</strong><br>${data.deviceInfo || '—'}</td>
+            <td>${data.approved ? '✅ Approved' : '⏳ Pending'}</td>
+            <td>
+              ${data.approved
+                ? `<button onclick="updateUser('${key}', false)">Reject</button>`
+                : `<button onclick="updateUser('${key}', true)">Approve</button>`}
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+      });
+    }
+
+    function updateUser(uid, status) {
+      db.ref("users/" + uid).update({ approved: status });
+
+      if (status) {
+        db.ref("users/" + uid).once("value").then(snap => {
+          const user = snap.val();
+          if (user.referredBy) {
+            db.ref("users").orderByChild("username").equalTo(user.referredBy).once("value").then(refSnap => {
+              refSnap.forEach(refUser => {
+                const refData = refUser.val();
+                let earning = 0;
+                if (refData.plan === "1000") earning = 300;
+                else if (refData.plan === "1500") earning = 500;
+                else if (refData.plan === "2000") earning = 1000;
+
+                const newInvites = (refData.inviteCount || 0) + 1;
+                const newEarn = (refData.totalEarning || 0) + earning;
+
+                db.ref("users/" + refUser.key).update({
+                  inviteCount: newInvites,
+                  totalEarning: newEarn
+                });
+              });
+            });
+          }
+        });
+      }
+    }
+  </script>
+</body>
+</html>

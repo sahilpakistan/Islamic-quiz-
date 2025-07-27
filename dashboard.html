@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>User Dashboard — Islamic Quiz</title>
+  <style>
+    body { font-family:'Segoe UI', sans-serif; background:#f4f4f4; margin:0; padding:20px; }
+    .container { max-width:800px; margin:auto; background:#fff; padding:20px; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.1); }
+    h2, h3 { color: #d35400; }
+    .info { margin-bottom:20px; }
+    .info div { margin-bottom:8px; }
+    table { width:100%; border-collapse:collapse; margin-top:20px; }
+    th,td { padding:10px; border:1px solid #ddd; text-align:left; }
+    th { background:#e67e22; color:white; }
+    a { color: #2980b9; text-decoration: underline; }
+    button { background:#e74c3c; color:white; padding:10px 16px; border:none; border-radius:5px; cursor:pointer; }
+    button:hover { background:#c0392b; }
+  </style>
+</head>
+<body>
+  <div class="container" id="loginSection">
+    <h2>Login to Dashboard</h2>
+    <input type="email" id="email" placeholder="Email" style="width:100%;padding:10px;margin-bottom:10px;" />
+    <input type="password" id="password" placeholder="Password" style="width:100%;padding:10px;" />
+    <button onclick="login()">Login</button>
+    <p id="loginError" style="color:red;"></p>
+  </div>
+
+  <div class="container" id="dashboard" style="display:none;">
+    <h2>Welcome, <span id="userName"></span> 🎉</h2>
+    <div class="info">
+      <div><strong>Email:</strong> <span id="userEmail"></span></div>
+      <div><strong>WhatsApp:</strong> <span id="userPhone"></span></div>
+      <div><strong>Your Invite Link:</strong> <span id="inviteLink"></span></div>
+      <div><strong>Total Invites:</strong> <span id="inviteCount">0</span></div>
+      <div><strong>Total Earnings:</strong> <span id="totalEarning">0</span> PKR</div>
+      <div><strong>Your Payment Screenshot:</strong> <a href="#" id="paymentShot" target="_blank">View</a></div>
+    </div>
+
+    <h3>Invited Users:</h3>
+    <table>
+      <thead><tr><th>Username</th><th>Email</th><th>Status</th></tr></thead>
+      <tbody id="invitedUsers"></tbody>
+    </table>
+
+    <br><button onclick="logout()">Logout</button>
+  </div>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyBa71bd1qm1vga00Ghcl14Mo6SPo8ng_etU",
+      authDomain: "islamic-quiz-3f4a2.firebaseapp.com",
+      databaseURL: "https://islamic-quiz-3f4a2-default-rtdb.firebaseio.com",
+      projectId: "islamic-quiz-3f4a2",
+      storageBucket: "islamic-quiz-3f4a2.appspot.com",
+      messagingSenderId: "521529942420",
+      appId: "1:521529942420:web:bb64ffcced52a02eb89511"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.database();
+
+    function login() {
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value.trim();
+      auth.signInWithEmailAndPassword(email, password)
+        .then(cred => {
+          checkApproval(cred.user.uid);
+        })
+        .catch(err => {
+          document.getElementById("loginError").innerText = err.message;
+        });
+    }
+
+    function logout() {
+      auth.signOut().then(() => location.reload());
+    }
+
+    function checkApproval(uid) {
+      db.ref("users/" + uid).once("value").then(snapshot => {
+        const data = snapshot.val();
+        if (!data.approved) {
+          alert("🕒 Your account is still pending admin approval.");
+          auth.signOut();
+        } else {
+          showDashboard(data, uid);
+        }
+      });
+    }
+
+    function showDashboard(data, uid) {
+      document.getElementById("loginSection").style.display = "none";
+      document.getElementById("dashboard").style.display = "block";
+
+      document.getElementById("userName").innerText = data.username;
+      document.getElementById("userEmail").innerText = data.email;
+      document.getElementById("userPhone").innerText = data.whatsapp;
+      document.getElementById("inviteLink").innerText = `${window.location.origin}/index.html?ref=${data.username}`;
+      document.getElementById("inviteCount").innerText = data.inviteCount || 0;
+      document.getElementById("totalEarning").innerText = data.totalEarning || 0;
+      document.getElementById("paymentShot").href = data.screenshotURL;
+
+      loadInvitedUsers(data.username);
+    }
+
+    function loadInvitedUsers(refName) {
+      db.ref("users").orderByChild("referredBy").equalTo(refName).once("value", snap => {
+        const tbody = document.getElementById("invitedUsers");
+        tbody.innerHTML = "";
+        snap.forEach(child => {
+          const u = child.val();
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <td>${u.username}</td>
+            <td>${u.email}</td>
+            <td>${u.approved ? '✅ Approved' : '⏳ Pending'}</td>
+          `;
+          tbody.appendChild(row);
+        });
+      });
+    }
+  </script>
+</body>
+</html>
