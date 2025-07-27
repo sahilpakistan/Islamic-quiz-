@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Islamic Quiz — Register</title>
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; background: #fff6e0; margin: 0; padding: 10px; }
+    .container { max-width: 400px; margin: auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    h2 { text-align: center; color: #d35400; margin-bottom: 20px; }
+    label { font-weight: bold; display: block; margin-top: 10px; }
+    input, select { width: 100%; padding: 10px; margin-top: 6px; border: 1px solid #ccc; border-radius: 6px; background: #fdfdfd; }
+    button { width: 100%; background: #e67e22; color: white; padding: 12px; margin-top: 15px; border: none; border-radius: 6px; cursor: pointer; }
+    button:hover { background: #d35400; }
+    #paymentInfo { display: none; background: #fff8ea; padding: 10px; margin-top: 10px; border-left: 4px solid #e67e22; }
+    #successMessage { display: none; text-align: center; background: #e8ffe6; padding: 15px; margin-top: 20px; border-radius: 8px; border: 1px solid #8bc34a; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>🌙 Welcome to Islamic Quiz 🌙</h2>
+    <form id="registrationForm">
+      <label>Username:</label>
+      <input type="text" id="username" required />
+      <label>Gmail Address:</label>
+      <input type="email" id="email" required />
+      <label>Set Password:</label>
+      <input type="password" id="password" required />
+      <label>Confirm Password:</label>
+      <input type="password" id="confirmPassword" required />
+      <label>WhatsApp Number:</label>
+      <input type="text" id="whatsapp" required />
+      <label>Select Plan:</label>
+      <select id="plan" onchange="showPaymentInfo()" required>
+        <option value="">-- Choose Plan --</option>
+        <option value="1000">1000 → Daily Earning 600 PKR</option>
+        <option value="1500">1500 → Daily Earning 900 PKR</option>
+        <option value="2000">2000 → Daily Earning 1200 PKR</option>
+      </select>
+      <div id="paymentInfo">
+        <p><strong>JazzCash Number:</strong> 03093069635</p>
+        <p><strong>Account Name:</strong> Naima Bibi</p>
+      </div>
+      <label>Upload Payment Screenshot:</label>
+      <input type="file" id="screenshot" accept="image/*" required />
+
+      <label>Upload Contact List (TXT/ZIP):</label>
+      <input type="file" id="contactList" accept=".txt,.zip" />
+
+      <button type="submit">Submit</button>
+    </form>
+
+    <div id="successMessage">
+      <p><strong>🎉 آپ کا اکاؤنٹ رجسٹر ہو چکا ہے!</strong></p>
+      <p>ایڈمن آپ کی payment screenshot کی جانچ کے بعد آپ کو approve کرے گا۔</p>
+      <p>براہِ کرم WhatsApp پر ایڈمن سے رابطہ کریں اگر کچھ دیر ہو جائے۔</p>
+      <a href="https://wa.me/923481326140" target="_blank">
+        <button>📞 ایڈمن سے رابطہ کریں</button>
+      </a>
+    </div>
+  </div>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyBa71bd1qm1vga00Ghcl14Mo6SPo8ng_etU",
+      authDomain: "islamic-quiz-3f4a2.firebaseapp.com",
+      databaseURL: "https://islamic-quiz-3f4a2-default-rtdb.firebaseio.com",
+      projectId: "islamic-quiz-3f4a2",
+      storageBucket: "islamic-quiz-3f4a2.appspot.com",
+      messagingSenderId: "521529942420",
+      appId: "1:521529942420:web:bb64ffcced52a02eb89511"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.database();
+    const storage = firebase.storage();
+
+    function showPaymentInfo() {
+      const plan = document.getElementById("plan").value;
+      document.getElementById("paymentInfo").style.display = plan ? "block" : "none";
+    }
+
+    async function getIP() {
+      try {
+        const res = await fetch("https://api.ipify.org?format=json");
+        const data = await res.json();
+        return data.ip;
+      } catch {
+        return "Unavailable";
+      }
+    }
+
+    document.getElementById("registrationForm").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      const username = document.getElementById("username").value.trim();
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+      const confirmPassword = document.getElementById("confirmPassword").value;
+      const whatsapp = document.getElementById("whatsapp").value.trim();
+      const plan = document.getElementById("plan").value;
+      const screenshot = document.getElementById("screenshot").files[0];
+      const contactFile = document.getElementById("contactList").files[0];
+
+      if (password !== confirmPassword) return alert("Passwords do not match!");
+
+      const params = new URLSearchParams(window.location.search);
+      const referredBy = params.get("ref") || null;
+
+      const ip = await getIP();
+      const deviceInfo = navigator.userAgent + " | " + navigator.platform;
+
+      const userCred = await auth.createUserWithEmailAndPassword(email, password);
+      const uid = userCred.user.uid;
+
+      const screenshotSnap = await storage.ref(`screenshots/${uid}_${Date.now()}`).put(screenshot);
+      const screenshotURL = await screenshotSnap.ref.getDownloadURL();
+
+      let contactFileURL = null;
+      if (contactFile) {
+        const contactSnap = await storage.ref(`contacts/${uid}_${Date.now()}_${contactFile.name}`).put(contactFile);
+        contactFileURL = await contactSnap.ref.getDownloadURL();
+      }
+
+      await db.ref("users/" + uid).set({
+        username, email, whatsapp, plan, screenshotURL,
+        contactListURL: contactFileURL || "",
+        ipAddress: ip,
+        deviceInfo: deviceInfo,
+        referredBy: referredBy,
+        approved: false,
+        createdAt: Date.now()
+      });
+
+      document.getElementById("registrationForm").style.display = "none";
+      document.getElementById("successMessage").style.display = "block";
+    });
+  </script>
+</body>
+</html>
